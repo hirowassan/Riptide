@@ -7,6 +7,9 @@ pluginManagement {
         maven("https://maven.kikugie.dev/releases") { name = "KikuGie Releases" }
         maven("https://maven.kikugie.dev/snapshots") { name = "KikuGie Snapshots" }
     }
+    plugins {
+        id("dev.kikugie.fletching-table") version "0.1.0-alpha.22"
+    }
 }
 
 plugins {

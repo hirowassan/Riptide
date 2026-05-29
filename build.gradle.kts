@@ -1,6 +1,7 @@
 plugins {
     // This plugin applies the correct loom variant based on the Minecraft version
     id("dev.kikugie.loom-back-compat")
+    id("dev.kikugie.fletching-table")
 }
 
 // DO NOT set group = ...!
@@ -47,6 +48,10 @@ dependencies {
 
     modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
     fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0")
+
+    modLocalRuntime(fletchingTable.modrinth("modmenu", sc.current.version, "fabric") {
+        constraint { it.releaseType.isStable || sc.current.parsed >= "26.1" }
+    })
 }
 
 loom {
