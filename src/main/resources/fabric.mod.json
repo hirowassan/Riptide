@@ -16,11 +16,11 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "com.example.TemplateMod"
+      "com.hirowassan.TemplateMod"
     ]
   },
   "mixins": [
-    "template.mixins.json"
+    "riptideeverywhere.mixins.json"
   ],
   "accessWidener": "template.ct",
   "depends": {

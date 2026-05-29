@@ -1,4 +1,4 @@
-package com.example;
+package com.hirowassan;
 
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.resources.Identifier;
@@ -11,7 +11,7 @@ public class TemplateMod implements ModInitializer {
     // That way, it's clear which mod wrote info, warnings, and errors.
     public static final Logger LOGGER = LoggerFactory.getLogger("template");
     public static final String VERSION = /*$ mod_version*/ "0.1.0";
-    public static final String MINECRAFT = /*$ minecraft*/ "26.1.1";
+    public static final String MINECRAFT = /*$ minecraft*/ "26.1.2";
 
     @Override
     public void onInitialize() {
