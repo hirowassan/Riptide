@@ -1,25 +1,44 @@
-# Stonecutter Fabric template
-## Setup
-1. Review the supported Minecraft versions in `settings.gradle.kts`.
-   For new entries, add `versions/.../gradle.properties` with the same keys as other versions.
-2. Change `mod.group`, `mod.id` and `mod.name` properties in `gradle.properties`.
-3. Rename `com.hirowassan` package in `src/main/java`.
-4. Rename `src/main/resources/template.mixins.json` to use your mod's id.
-5. Review the `LICENSE` file. 
-   See the [license decision diagram](https://docs.codeberg.org/getting-started/licensing/#license-decision-diagram) for common options.
-6. Review `src/main/resources/fabric.mod.json` to have up-to-date properties.
+# Riptide Everywhere
 
-## Usage
-- Use `"Set active project to ..."` Gradle tasks to update the Minecraft version
-  available in `src/` classes.
-- Use `buildAndCollect` Gradle task to store mod releases in `build/libs/`.
-- Enable `mod-publish-plugin` in `stonecutter.gradle.kts` and `build.gradle.kts`
-  and the corresponding code blocks to publish releases to Modrinth and Curseforge.
-- Enable `maven-publish` in `build.gradle.kts` and the corresponding code block
-  to publish releases to a personal maven repository.
+Allows you to use the Riptide enchantment on tridents in any weather condition — no water required.
 
-## Useful links
-- [Stonecutter beginner's guide](https://stonecutter.kikugie.dev/wiki/start/): *spoiler: you* ***need*** *to understand how it works!*
-- [Fabric Discord server](https://discord.gg/v6v4pMv): for mod development help.
-- [Stonecutter Discord server](https://discord.kikugie.dev/): for Stonecutter and Gradle help.
-- [How To Ask Questions - the guide](http://www.catb.org/esr/faqs/smart-questions.html): also in [video form](https://www.youtube.com/results?search_query=How+To+Ask+Questions+The+Smart+Way).
+## Supported Platforms
+
+| Minecraft | Fabric | Legacy Forge | NeoForge |
+|-----------|:------:|:------------:|:--------:|
+| 1.19.4    |   ✅   |      ✅       |    -     |
+| 1.20.1    |   ✅   |      ✅       |    -     |
+| 1.21.11   |   ✅   |      ❌       |    -     |
+| 26.1      |   ✅   |      ❌       |    ✅    |
+
+## Building
+
+Build all platforms:
+
+```sh
+./gradlew build
+```
+
+Build a specific platform:
+
+```sh
+./gradlew :1.20.1-fabric:build
+./gradlew :26.1-neo:build
+```
+
+## Running
+
+```sh
+./gradlew :1.19.4-fabric:runClient
+./gradlew :1.19.4-forge:runClient
+./gradlew :1.20.1-fabric:runClient
+./gradlew :1.20.1-forge:runClient
+./gradlew :1.21.11-fabric:runClient
+./gradlew :26.1-fabric:runClient
+./gradlew :26.1-neo:runClient
+```
+
+## Requirements
+
+- JDK 17+ to configure Gradle (Temurin 25 recommended)
+- Java versions per Minecraft version are automatically downloaded via [Foojay Toolchain Resolver](https://github.com/gradle/foojay-toolchains)
