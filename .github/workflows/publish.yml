@@ -1,0 +1,203 @@
+name: Publish
+
+# Manual only: run from Actions -> Publish -> Run workflow.
+# Nothing is published on push.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (leave empty to use modVersion from gradle.properties)'
+        required: false
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - beta
+          - alpha
+      targets:
+        description: 'Comma-separated subprojects to publish'
+        required: true
+        default: '26.1-fabric,26.1-neo,26.3-fabric,26.3-neo'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION=$(sed -n 's/^modVersion=//p' gradle.properties)
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not determine version"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing version $VERSION"
+
+      - name: Build publish matrix
+        id: matrix
+        env:
+          TARGETS: ${{ inputs.targets }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+
+          entries = []
+          for target in [t.strip() for t in os.environ["TARGETS"].split(",") if t.strip()]:
+              if target.endswith("-fabric"):
+                  loader, label, minecraft = "fabric", "Fabric", target[: -len("-fabric")]
+              elif target.endswith("-neoforge"):
+                  loader, label, minecraft = "neoforge", "NeoForge", target[: -len("-neoforge")]
+              elif target.endswith("-neo"):
+                  loader, label, minecraft = "neoforge", "NeoForge", target[: -len("-neo")]
+              elif target.endswith("-forge"):
+                  loader, label, minecraft = "forge", "Forge", target[: -len("-forge")]
+              else:
+                  raise SystemExit(f"Cannot determine loader for target: {target}")
+
+              # 26.1 Fabric and NeoForge builds both accept the 26.1.x patch releases.
+              if minecraft == "26.1":
+                  game_versions = ["26.1", "26.1.1", "26.1.2"]
+              else:
+                  game_versions = [minecraft]
+
+              entries.append(
+                  {
+                      "subproject": target,
+                      "loader": loader,
+                      "loader_label": label,
+                      "minecraft": minecraft,
+                      "game_versions": "\n".join(game_versions),
+                  }
+              )
+
+          print("matrix=" + json.dumps({"include": entries}))
+          PY
+
+      - name: Check publishing tokens
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          set -euo pipefail
+          [ -n "$MODRINTH_TOKEN" ] || { echo "::error::MODRINTH_TOKEN secret is not set"; exit 1; }
+          [ -n "$CURSEFORGE_TOKEN" ] || { echo "::error::CURSEFORGE_TOKEN secret is not set"; exit 1; }
+
+      - name: Check CurseForge game versions
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body -sS \
+            -H "X-Api-Token: ${CURSEFORGE_TOKEN}" \
+            'https://minecraft.curseforge.com/api/game/versions' \
+            -o /tmp/cf-versions.json
+          python3 - <<'PY'
+          import json
+          import sys
+
+          with open("/tmp/cf-versions.json", encoding="utf-8") as f:
+              versions = json.load(f)
+
+          wanted = {"26.1", "26.1.1", "26.1.2", "26.3", "Fabric", "NeoForge"}
+          names = {v["name"] for v in versions}
+          missing = sorted(wanted - names)
+          if missing:
+              available = sorted(n for n in names if n.startswith("26."))
+              print("::error::CurseForge is missing game versions: " + ", ".join(missing))
+              print("Available 26.x versions: " + ", ".join(available))
+              sys.exit(1)
+          print("CurseForge game versions OK")
+          PY
+
+  publish:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set version in gradle.properties
+        run: sed -i "s/^modVersion=.*/modVersion=${VERSION}/" gradle.properties
+
+      - name: Setup JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'jetbrains'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build ${{ matrix.subproject }}
+        run: |
+          chmod u+x ./gradlew
+          ./gradlew ":${{ matrix.subproject }}:build" --no-daemon
+
+      - name: Extract changelog
+        run: |
+          python3 - <<'PY' > changelog-current.md
+          import os
+          import re
+          import sys
+
+          version = os.environ["VERSION"]
+          with open("CHANGELOG.md", encoding="utf-8") as f:
+              text = f.read()
+
+          match = re.search(
+              rf"^##[ \t]+{re.escape(version)}[ \t]*\n.*?(?=^##[ \t]|\Z)",
+              text,
+              re.MULTILINE | re.DOTALL,
+          )
+          if not match:
+              sys.exit(f"CHANGELOG.md has no '## {version}' section")
+          print(match.group(0).strip())
+          PY
+
+      - name: Publish to Modrinth and CurseForge
+        uses: Kira-NT/mc-publish@v3.3.2
+        with:
+          modrinth-id: iyXZ4d9T
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          curseforge-id: 1434080
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+
+          files: |
+            ${{ matrix.subproject }}/build/libs/*-v${{ needs.prepare.outputs.version }}.jar
+          name: Riptide Everywhere ${{ needs.prepare.outputs.version }} (${{ matrix.loader_label }} ${{ matrix.minecraft }})
+          version: ${{ needs.prepare.outputs.version }}+${{ matrix.minecraft }}-${{ matrix.loader }}
+          version-type: ${{ inputs.release_type }}
+          changelog-file: changelog-current.md
+          loaders: ${{ matrix.loader }}
+          game-versions: ${{ matrix.game_versions }}
+          environment: client | server
+          retry-attempts: 3
