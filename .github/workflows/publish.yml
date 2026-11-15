@@ -199,5 +199,6 @@ jobs:
           changelog-file: changelog-current.md
           loaders: ${{ matrix.loader }}
           game-versions: ${{ matrix.game_versions }}
+          game-version-filter: releases
           environment: client | server
           retry-attempts: 3
