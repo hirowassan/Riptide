@@ -1,0 +1,12 @@
+# Toolchain managed by mise (https://mise.jdx.dev/)
+#
+# Java 25 is used to run Gradle. The Java versions needed to compile each
+# Minecraft version (17/21/25) are provisioned by Gradle's Foojay toolchain
+# resolver, so they do not need to be listed here.
+#
+# Gradle is pinned to the same version as the wrapper in
+# gradle/wrapper/gradle-wrapper.properties. Day-to-day builds should use
+# ./gradlew; `mise install` only provides the bootstrap Gradle.
+[tools]
+java = "temurin-25.0.5+8.0.LTS"
+gradle = "9.4.0"

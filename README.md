@@ -47,5 +47,12 @@ Build a specific platform:
 
 ## Requirements
 
-- JDK 17+ to configure Gradle (Temurin 25 recommended)
+- [mise](https://mise.jdx.dev/) (recommended) or JDK 17+ to run Gradle (Temurin 25 recommended)
 - Java versions per Minecraft version are automatically downloaded via [Foojay Toolchain Resolver](https://github.com/gradle/foojay-toolchains)
+
+The repository includes a `mise.toml` that pins Java 25 and Gradle 9.4.0:
+
+```sh
+mise install   # installs the pinned tools
+./gradlew build
+```
