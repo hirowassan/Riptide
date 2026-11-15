@@ -10,6 +10,7 @@ Allows you to use the Riptide enchantment on tridents in any weather condition �
 | 1.20.1    |   ✅   |      ✅       |    -     |
 | 1.21.11   |   ✅   |      ❌       |    -     |
 | 26.1      |   ✅   |      ❌       |    ✅    |
+| 26.3      |   ✅   |      ❌       |    ✅    |
 
 ## Building
 
@@ -36,6 +37,8 @@ Build a specific platform:
 ./gradlew :1.21.11-fabric:runClient
 ./gradlew :26.1-fabric:runClient
 ./gradlew :26.1-neo:runClient
+./gradlew :26.3-fabric:runClient
+./gradlew :26.3-neo:runClient
 ```
 
 ## Requirements
