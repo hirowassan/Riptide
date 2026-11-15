@@ -45,6 +45,17 @@ Build a specific platform:
 ./gradlew :26.3-neo:runClient
 ```
 
+## Publishing
+
+The **Publish** GitHub Actions workflow builds selected subprojects and uploads them to Modrinth and CurseForge. It only runs when started manually from **Actions → Publish → Run workflow**; pushes do not publish anything.
+
+It requires these repository secrets:
+
+- `MODRINTH_TOKEN` — Modrinth personal access token with the `create_version` scope
+- `CURSEFORGE_TOKEN` — CurseForge API token
+
+By default it publishes the 26.1 and 26.3 Fabric/NeoForge builds. The version comes from `modVersion` in `gradle.properties` unless overridden in the workflow, and the release notes are read from that version's section in `CHANGELOG.md`. Project IDs are configured in `.github/workflows/publish.yml`.
+
 ## Requirements
 
 - [mise](https://mise.jdx.dev/) (recommended) or JDK 17+ to run Gradle (Temurin 25 recommended)
