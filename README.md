@@ -12,6 +12,10 @@ Allows you to use the Riptide enchantment on tridents in any weather condition �
 | 26.1      |   ✅   |      ❌       |    ✅    |
 | 26.3      |   ✅   |      ❌       |    ✅    |
 
+## Compatibility
+
+- [More Gears](https://github.com/CoolerProYT/MoreGears): its Enderite trident can use Riptide in any weather (26.1 and 26.3).
+
 ## Building
 
 Build all platforms:
