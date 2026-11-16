@@ -200,5 +200,5 @@ jobs:
           loaders: ${{ matrix.loader }}
           game-versions: ${{ matrix.game_versions }}
           game-version-filter: releases
-          environment: client | server
+          environment: client
           retry-attempts: 3
