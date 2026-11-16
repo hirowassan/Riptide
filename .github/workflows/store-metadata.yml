@@ -1,0 +1,168 @@
+name: Store metadata
+
+# One-off / maintenance workflow. Riptide Everywhere is a client-only mod, so
+# published files must not carry a "Server" tag and Modrinth versions must
+# report `client_only`.
+#
+# Modrinth does not allow changing `environment` on an existing version, so
+# affected versions are re-created from their published jar and the old
+# version is deleted afterwards.
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Platforms to fix (comma separated)"
+        type: string
+        default: "curseforge,modrinth"
+      modrinth_scope:
+        description: "Which Modrinth versions to re-create"
+        type: choice
+        options:
+          - new
+          - all
+        default: new
+
+permissions:
+  contents: read
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fix published metadata
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          TARGETS: ${{ inputs.targets }}
+          MR_SCOPE: ${{ inputs.modrinth_scope }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          import urllib.request
+
+          CF_PROJECT = 1434080
+          MR_PROJECT = "iyXZ4d9T"
+
+          cf_token = os.environ.get("CURSEFORGE_TOKEN", "")
+          mr_token = os.environ.get("MODRINTH_TOKEN", "")
+          targets = [t.strip() for t in os.environ["TARGETS"].split(",") if t.strip()]
+          scope = os.environ["MR_SCOPE"]
+
+
+          def get_json(url, headers=None):
+              req = urllib.request.Request(url, headers=headers or {})
+              with urllib.request.urlopen(req, timeout=60) as res:
+                  return json.load(res)
+
+
+          def run_curl(args):
+              shown = [a if "Api-Token" not in a and "Bearer" not in a else "***" for a in args]
+              print("+ curl " + " ".join(shown), flush=True)
+              proc = subprocess.run(
+                  ["curl", "-sS", "--fail-with-body", "--max-time", "300"] + args,
+                  capture_output=True,
+                  text=True,
+              )
+              print("  exit", proc.returncode, (proc.stdout or "").strip()[:2000], flush=True)
+              if proc.returncode != 0:
+                  raise SystemExit("curl failed: " + (proc.stderr or "").strip()[:2000])
+              return proc.stdout
+
+
+          # ---------------------------------------------------------------- CurseForge
+          if "curseforge" in targets:
+              if not cf_token:
+                  raise SystemExit("CURSEFORGE_TOKEN is not set")
+              url = (
+                  f"https://www.curseforge.com/api/v1/mods/{CF_PROJECT}/files"
+                  "?pageIndex=0&pageSize=50"
+              )
+              files = get_json(url)["data"]
+              pending = [
+                  f
+                  for f in files
+                  if "1.0.1" in f["displayName"] and "Server" in f["gameVersions"]
+              ]
+              print(f"CurseForge: {len(pending)} file(s) with a Server tag", flush=True)
+              for f in pending:
+                  names = [n for n in f["gameVersions"] if n != "Server"]
+                  with open("/tmp/cf-meta.json", "w", encoding="utf-8") as fh:
+                      json.dump({"fileID": f["id"], "gameVersionNames": names}, fh)
+                  print(f"  update {f['id']} -> {names}", flush=True)
+                  run_curl(
+                      [
+                          "-X",
+                          "POST",
+                          f"https://minecraft.curseforge.com/api/projects/{CF_PROJECT}/update-file",
+                          "-H",
+                          f"X-Api-Token: {cf_token}",
+                          "-F",
+                          "metadata=</tmp/cf-meta.json;type=application/json",
+                      ]
+                  )
+
+          # ------------------------------------------------------------------ Modrinth
+          if "modrinth" in targets:
+              if not mr_token:
+                  raise SystemExit("MODRINTH_TOKEN is not set")
+              auth = {"Authorization": f"Bearer {mr_token}"}
+              versions = get_json(
+                  f"https://api.modrinth.com/v2/project/{MR_PROJECT}/version", auth
+              )
+              pending = [v for v in versions if v["environment"] != "client_only"]
+              if scope == "new":
+                  pending = [v for v in pending if v["version_number"].startswith("1.0.1")]
+              print(f"Modrinth: {len(pending)} version(s) to re-create", flush=True)
+              for v in pending:
+                  primary = v["files"][0]
+                  jar = os.path.join("/tmp", primary["filename"])
+                  urllib.request.urlretrieve(primary["url"], jar)
+                  payload = {
+                      "project_id": MR_PROJECT,
+                      "name": v["name"],
+                      "version_number": v["version_number"],
+                      "changelog": v["changelog"],
+                      "dependencies": v["dependencies"],
+                      "game_versions": v["game_versions"],
+                      "version_type": v["version_type"],
+                      "loaders": v["loaders"],
+                      "featured": v["featured"],
+                      "environment": "client_only",
+                      "file_parts": ["file"],
+                      "primary_file": "file",
+                  }
+                  with open("/tmp/mr-data.json", "w", encoding="utf-8") as fh:
+                      json.dump(payload, fh)
+                  print(f"  re-create {v['version_number']} (old id {v['id']})", flush=True)
+                  out = run_curl(
+                      [
+                          "-X",
+                          "POST",
+                          "https://api.modrinth.com/v2/version",
+                          "-H",
+                          f"Authorization: Bearer {mr_token}",
+                          "-F",
+                          "data=</tmp/mr-data.json;type=application/json",
+                          "-F",
+                          f"file=@{jar};type=application/java-archive",
+                      ]
+                  )
+                  created = json.loads(out)
+                  print(
+                      f"    created {created['id']} env={created['environment']}",
+                      flush=True,
+                  )
+                  run_curl(
+                      [
+                          "-X",
+                          "DELETE",
+                          f"https://api.modrinth.com/v2/version/{v['id']}",
+                          "-H",
+                          f"Authorization: Bearer {mr_token}",
+                      ]
+                  )
+          PY
